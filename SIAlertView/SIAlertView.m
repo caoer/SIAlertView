@@ -899,7 +899,7 @@ static SIAlertView *__si_alert_current_view;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShowNotification:) name:UIKeyboardWillShowNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHideNotification:) name:UIKeyboardWillHideNotification object:nil];
     }
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)setupButtons
