@@ -64,7 +64,7 @@ static SIAlertView *__si_alert_current_view;
 + (void)hideBackgroundAnimated:(BOOL)animated;
 
 - (void)setup;
-- (void)invaliadateLayout;
+- (void)invalidateLayout;
 - (void)resetTransition;
 
 @end
@@ -165,7 +165,7 @@ static SIAlertView *__si_alert_current_view;
 - (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
 {
     [self.alertView resetTransition];
-    [self.alertView invaliadateLayout];
+    [self.alertView invalidateLayout];
 }
 
 - (NSUInteger)supportedInterfaceOrientations
@@ -299,13 +299,13 @@ static SIAlertView *__si_alert_current_view;
 - (void)setTitle:(NSString *)title
 {
     _title = title;
-	[self invaliadateLayout];
+	[self invalidateLayout];
 }
 
 - (void)setMessage:(NSString *)message
 {
 	_message = message;
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 #pragma mark - Public
@@ -655,7 +655,7 @@ static SIAlertView *__si_alert_current_view;
     [self validateLayout];
 }
 
-- (void)invaliadateLayout
+- (void)invalidateLayout
 {
     self.layoutDirty = YES;
     [self setNeedsLayout];
@@ -771,7 +771,7 @@ static SIAlertView *__si_alert_current_view;
     if (self.titleLabel) {
         CGSize size = [self.title sizeWithFont:self.titleLabel.font
                                    minFontSize:
-#ifndef __IPHONE_6_0
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_6_0
                        self.titleLabel.font.pointSize * self.titleLabel.minimumScaleFactor
 #else
                        self.titleLabel.minimumFontSize
@@ -808,7 +808,7 @@ static SIAlertView *__si_alert_current_view;
         [self setupTextField];
     }
     [self setupButtons];
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)teardown
@@ -820,12 +820,13 @@ static SIAlertView *__si_alert_current_view;
     [self.buttons removeAllObjects];
     [self.alertWindow removeFromSuperview];
     self.alertWindow = nil;
+    self.layoutDirty = NO;
 }
 
 - (void)setupContainerView
 {
     self.containerView = [[UIView alloc] initWithFrame:self.bounds];
-    self.containerView.backgroundColor = [UIColor whiteColor];
+    self.containerView.backgroundColor = _viewBackgroundColor ? _viewBackgroundColor : [UIColor whiteColor];
     self.containerView.layer.cornerRadius = self.cornerRadius;
     self.containerView.layer.shadowOffset = CGSizeZero;
     self.containerView.layer.shadowRadius = self.shadowRadius;
@@ -843,7 +844,7 @@ static SIAlertView *__si_alert_current_view;
 			self.titleLabel.font = self.titleFont;
             self.titleLabel.textColor = self.titleColor;
             self.titleLabel.adjustsFontSizeToFitWidth = YES;
-#ifndef __IPHONE_6_0
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_6_0
             self.titleLabel.minimumScaleFactor = 0.75;
 #else
             self.titleLabel.minimumFontSize = self.titleLabel.font.pointSize * 0.75;
@@ -858,7 +859,7 @@ static SIAlertView *__si_alert_current_view;
 		[self.titleLabel removeFromSuperview];
 		self.titleLabel = nil;
 	}
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)updateMessageLabel
@@ -881,7 +882,7 @@ static SIAlertView *__si_alert_current_view;
         [self.messageLabel removeFromSuperview];
         self.messageLabel = nil;
     }
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)setupTextField
@@ -1048,7 +1049,7 @@ static SIAlertView *__si_alert_current_view;
     }
     _titleFont = titleFont;
     self.titleLabel.font = titleFont;
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)setMessageFont:(UIFont *)messageFont
@@ -1058,7 +1059,7 @@ static SIAlertView *__si_alert_current_view;
     }
     _messageFont = messageFont;
     self.messageLabel.font = messageFont;
-    [self invaliadateLayout];
+    [self invalidateLayout];
 }
 
 - (void)setTitleColor:(UIColor *)titleColor
@@ -1134,6 +1135,39 @@ static SIAlertView *__si_alert_current_view;
     _destructiveButtonColor = buttonColor;
     [self setColor:buttonColor toButtonsOfType:SIAlertViewButtonTypeDestructive];
 }
+
+
+- (void)setDefaultButtonImage:(UIImage *)defaultButtonImage forState:(UIControlState)state
+{
+    [self setButtonImage:defaultButtonImage forState:state andButtonType:SIAlertViewButtonTypeDefault];
+}
+
+
+- (void)setCancelButtonImage:(UIImage *)cancelButtonImage forState:(UIControlState)state
+{
+    [self setButtonImage:cancelButtonImage forState:state andButtonType:SIAlertViewButtonTypeCancel];
+}
+
+
+- (void)setDestructiveButtonImage:(UIImage *)destructiveButtonImage forState:(UIControlState)state
+{
+    [self setButtonImage:destructiveButtonImage forState:state andButtonType:SIAlertViewButtonTypeDestructive];
+}
+
+
+- (void)setButtonImage:(UIImage *)image forState:(UIControlState)state andButtonType:(SIAlertViewButtonType)type
+{
+    for (NSUInteger i = 0; i < self.items.count; i++)
+    {
+        SIAlertItem *item = self.items[i];
+        if(item.type == type)
+        {
+            UIButton *button = self.buttons[i];
+            [button setBackgroundImage:image forState:state];
+        }
+    }
+}
+
 
 -(void)setColor:(UIColor *)color toButtonsOfType:(SIAlertViewButtonType)type {
     for (NSUInteger i = 0; i < self.items.count; i++) {
