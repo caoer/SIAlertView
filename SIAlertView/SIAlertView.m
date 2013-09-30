@@ -37,11 +37,69 @@ static BOOL __si_alert_animating;
 static SIAlertBackgroundWindow *__si_alert_background_window;
 static SIAlertView *__si_alert_current_view;
 
+@interface UIWindow (SIAlert_Utils)
+
+- (UIViewController *)currentViewController;
+
+@end
+
+@implementation UIWindow (SIAlert_Utils)
+
+- (UIViewController *)currentViewController
+{
+    UIViewController *viewController = self.rootViewController;
+    while (viewController.presentedViewController) {
+        viewController = viewController.presentedViewController;
+    }
+    return viewController;
+}
+
+@end
+
+#ifdef __IPHONE_7_0
+@interface UIWindow (SIAlert_StatusBarUtils)
+
+- (UIViewController *)viewControllerForStatusBarStyle;
+- (UIViewController *)viewControllerForStatusBarHidden;
+
+@end
+
+@implementation UIWindow (SIAlert_StatusBarUtils)
+
+- (UIViewController *)viewControllerForStatusBarStyle
+{
+    UIViewController *currentViewController = [self currentViewController];
+    
+    if ([currentViewController childViewControllerForStatusBarStyle]) {
+        return [currentViewController childViewControllerForStatusBarStyle];
+    } else {
+        return currentViewController;
+    }
+}
+
+- (UIViewController *)viewControllerForStatusBarHidden
+{
+    UIViewController *currentViewController = [self currentViewController];
+    
+    if ([currentViewController childViewControllerForStatusBarHidden]) {
+        return [currentViewController childViewControllerForStatusBarHidden];
+    } else {
+        return currentViewController;
+    }
+}
+
+@end
+#endif
+
+
 @interface SIAlertView ()
 
 @property (nonatomic, strong) NSMutableArray *items;
-@property (nonatomic, strong) UIWindow *oldKeyWindow;
+@property (nonatomic, weak) UIWindow *oldKeyWindow;
 @property (nonatomic, strong) UIWindow *alertWindow;
+#ifdef __IPHONE_7_0
+@property (nonatomic, assign) UIViewTintAdjustmentMode oldTintAdjustmentMode;
+#endif
 @property (nonatomic, assign, getter = isVisible) BOOL visible;
 
 @property (nonatomic, strong) UILabel *titleLabel;
@@ -168,20 +226,61 @@ static SIAlertView *__si_alert_current_view;
     [self.alertView invalidateLayout];
 }
 
+#ifdef __IPHONE_7_0
+- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
+{
+    if ([self respondsToSelector:@selector(setNeedsStatusBarAppearanceUpdate)]) {
+        [self setNeedsStatusBarAppearanceUpdate];
+    }
+}
+#endif
+
 - (NSUInteger)supportedInterfaceOrientations
 {
+    UIViewController *viewController = [self.alertView.oldKeyWindow currentViewController];
+    if (viewController) {
+        return [viewController supportedInterfaceOrientations];
+    }
     return UIInterfaceOrientationMaskAll;
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation
 {
+    UIViewController *viewController = [self.alertView.oldKeyWindow currentViewController];
+    if (viewController) {
+        return [viewController shouldAutorotateToInterfaceOrientation:toInterfaceOrientation];
+    }
     return YES;
 }
 
 - (BOOL)shouldAutorotate
 {
+    UIViewController *viewController = [self.alertView.oldKeyWindow currentViewController];
+    if (viewController) {
+        return [viewController shouldAutorotate];
+    }
     return YES;
 }
+
+#ifdef __IPHONE_7_0
+- (UIStatusBarStyle)preferredStatusBarStyle
+{
+    UIWindow *window = self.alertView.oldKeyWindow;
+    if (!window) {
+        window = [UIApplication sharedApplication].windows[0];
+    }
+    return [[window viewControllerForStatusBarStyle] preferredStatusBarStyle];
+}
+
+- (BOOL)prefersStatusBarHidden
+{
+    UIWindow *window = self.alertView.oldKeyWindow;
+    if (!window) {
+        window = [UIApplication sharedApplication].windows[0];
+    }
+    return [[window viewControllerForStatusBarHidden] prefersStatusBarHidden];
+}
+#endif
 
 @end
 
@@ -321,7 +420,17 @@ static SIAlertView *__si_alert_current_view;
 
 - (void)show
 {
+    if (self.isVisible) {
+        return;
+    }
+    
     self.oldKeyWindow = [[UIApplication sharedApplication] keyWindow];
+#ifdef __IPHONE_7_0
+    if ([self.oldKeyWindow respondsToSelector:@selector(setTintAdjustmentMode:)]) { // for iOS 7
+        self.oldTintAdjustmentMode = self.oldKeyWindow.tintAdjustmentMode;
+        self.oldKeyWindow.tintAdjustmentMode = UIViewTintAdjustmentModeDimmed;
+    }
+#endif
 
     if (![[SIAlertView sharedQueue] containsObject:self]) {
         [[SIAlertView sharedQueue] addObject:self];
@@ -329,10 +438,6 @@ static SIAlertView *__si_alert_current_view;
     
     if ([SIAlertView isAnimating]) {
         return; // wait for next turn
-    }
-    
-    if (self.isVisible) {
-        return;
     }
     
     if ([SIAlertView currentAlertView].isVisible) {
@@ -467,8 +572,17 @@ static SIAlertView *__si_alert_current_view;
         }
     }
     
-    [self.oldKeyWindow makeKeyWindow];
-    self.oldKeyWindow.hidden = NO;
+    UIWindow *window = self.oldKeyWindow;
+#ifdef __IPHONE_7_0
+    if ([window respondsToSelector:@selector(setTintAdjustmentMode:)]) {
+        window.tintAdjustmentMode = self.oldTintAdjustmentMode;
+    }
+#endif
+    if (!window) {
+        window = [UIApplication sharedApplication].windows[0];
+    }
+    [window makeKeyWindow];
+    window.hidden = NO;
 }
 
 #pragma mark - Transitions
@@ -708,7 +822,7 @@ static SIAlertView *__si_alert_current_view;
         if (y > CONTENT_PADDING_TOP) {
             y += GAP;
         }
-        if (self.items.count == 2) {
+        if (self.items.count == 2 && self.buttonsListStyle == SIAlertViewButtonsListStyleNormal) {
             CGFloat width = (self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2 - GAP) * 0.5;
             UIButton *button = self.buttons[0];
             button.frame = CGRectMake(CONTENT_PADDING_LEFT, y, width, BUTTON_HEIGHT);
@@ -753,7 +867,7 @@ static SIAlertView *__si_alert_current_view;
         if (height > CONTENT_PADDING_TOP) {
             height += GAP;
         }
-        if (self.items.count <= 2) {
+        if (self.items.count <= 2 && self.buttonsListStyle == SIAlertViewButtonsListStyleNormal) {
             height += BUTTON_HEIGHT;
         } else {
             height += (BUTTON_HEIGHT + GAP) * self.items.count - GAP;
