@@ -24,7 +24,7 @@ NSString *const SIAlertViewDidDismissNotification = @"SIAlertViewDidDismissNotif
 #define CONTENT_PADDING_TOP 12
 #define CONTENT_PADDING_BOTTOM 10
 #define BUTTON_HEIGHT 44
-#define CONTAINER_WIDTH 300
+#define CONTAINER_WIDTH 290
 
 const UIWindowLevel UIWindowLevelSIAlert = 1999.0;  // don't overlap system's alert
 const UIWindowLevel UIWindowLevelSIAlertBackground = 1998.0; // below the alert window
@@ -314,9 +314,19 @@ static SIAlertView *__si_alert_current_view;
 	if (self) {
 		_title = title;
         _message = message;
+        _enabledParallaxEffect = YES;
 		self.items = [[NSMutableArray alloc] init];
 	}
 	return self;
+}
+
+- (id)initWithTitle:(NSString *)title andMessage:(NSString *)message andContentView:(UIView *)contentView
+{
+    self = [self initWithTitle:title andMessage:message];
+    if (self) {
+        _contentView = contentView;
+    }
+    return self;
 }
 
 #pragma mark - Class methods
@@ -394,6 +404,12 @@ static SIAlertView *__si_alert_current_view;
     [self invalidateLayout];
 }
 
+- (void)setContentView:(UIView *)contentView
+{
+    _containerView = contentView;
+    [self invalidateLayout];
+}
+
 #pragma mark - Public
 
 - (void)addButtonWithTitle:(NSString *)title type:(SIAlertViewButtonType)type handler:(SIAlertViewHandler)handler
@@ -466,6 +482,9 @@ static SIAlertView *__si_alert_current_view;
             self.didShowHandler(self);
         }
         [[NSNotificationCenter defaultCenter] postNotificationName:SIAlertViewDidShowNotification object:self userInfo:nil];
+        #ifdef __IPHONE_7_0
+        [self addParallaxEffect];
+        #endif
         
         [SIAlertView setAnimating:NO];
         
@@ -490,6 +509,9 @@ static SIAlertView *__si_alert_current_view;
             self.willDismissHandler(self);
         }
         [[NSNotificationCenter defaultCenter] postNotificationName:SIAlertViewWillDismissNotification object:self userInfo:nil];
+        #ifdef __IPHONE_7_0
+                [self removeParallaxEffect];
+        #endif
     }
     
     void (^dismissComplete)(void) = ^{
@@ -771,7 +793,19 @@ static SIAlertView *__si_alert_current_view;
     self.containerView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.containerView.bounds cornerRadius:self.containerView.layer.cornerRadius].CGPath;
     
     CGFloat y = CONTENT_PADDING_TOP;
+    if (self.contentView) {
+        if (y > CONTENT_PADDING_TOP) {
+            y += GAP;
+        }
+        CGFloat height = self.contentView.bounds.size.height;
+        self.contentView.frame = CGRectMake(CONTENT_PADDING_LEFT, y, self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2, height);
+        y += height;
+    }
+    
 	if (self.titleLabel) {
+        if (y > CONTENT_PADDING_TOP) {
+            y += GAP;
+        }
         self.titleLabel.text = self.title;
         CGFloat height = [self heightForTitleLabel];
         self.titleLabel.frame = CGRectMake(CONTENT_PADDING_LEFT, y, self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2, height);
@@ -825,6 +859,12 @@ static SIAlertView *__si_alert_current_view;
         }
         height += [self heightForMessageLabel];
     }
+    if (self.contentView) {
+        if (height > CONTENT_PADDING_TOP) {
+            height += GAP;
+        }
+        height += self.contentView.frame.size.height;
+    }
     if (self.items.count > 0) {
         if (height > CONTENT_PADDING_TOP) {
             height += GAP;
@@ -839,23 +879,25 @@ static SIAlertView *__si_alert_current_view;
         }
     }
     height += CONTENT_PADDING_BOTTOM;
+    
 	return height;
 }
 
 - (CGFloat)heightForTitleLabel
 {
     if (self.titleLabel) {
-        CGSize size = [self.title sizeWithFont:self.titleLabel.font
-                                   minFontSize:
-#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_6_0
-                       self.titleLabel.font.pointSize * self.titleLabel.minimumScaleFactor
-#else
-                       self.titleLabel.minimumFontSize
-#endif
-                                actualFontSize:nil
-                                      forWidth:CONTAINER_WIDTH - CONTENT_PADDING_LEFT * 2
-                                 lineBreakMode:self.titleLabel.lineBreakMode];
-        return size.height;
+        
+        UIFont *font = self.titleLabel.font;
+        
+        CGFloat constrainedHeight = font.lineHeight;
+        
+        NSDictionary *fontAtts = @{NSFontAttributeName : font};
+        
+        CGRect rect = [self.title boundingRectWithSize:CGSizeMake(CONTAINER_WIDTH - CONTENT_PADDING_LEFT * 2, constrainedHeight)
+                                                      options:NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesLineFragmentOrigin
+                                                   attributes:fontAtts
+                                                      context:nil];
+        return rect.size.height;
     }
     return 0;
 }
@@ -864,11 +906,19 @@ static SIAlertView *__si_alert_current_view;
 {
     CGFloat minHeight = MESSAGE_MIN_LINE_COUNT * self.messageLabel.font.lineHeight;
     if (self.messageLabel) {
-        CGFloat maxHeight = MESSAGE_MAX_LINE_COUNT * self.messageLabel.font.lineHeight;
-        CGSize size = [self.message sizeWithFont:self.messageLabel.font
-                               constrainedToSize:CGSizeMake(CONTAINER_WIDTH - CONTENT_PADDING_LEFT * 2, maxHeight)
-                                   lineBreakMode:self.messageLabel.lineBreakMode];
-        return MAX(minHeight, size.height);
+        
+        UIFont *font = self.messageLabel.font;
+        
+        CGFloat maxHeight = MESSAGE_MAX_LINE_COUNT * font.lineHeight;
+        
+        NSDictionary *fontAtts = @{NSFontAttributeName : font};
+        
+        CGRect rect = [self.title boundingRectWithSize:CGSizeMake(CONTAINER_WIDTH - CONTENT_PADDING_LEFT * 2, maxHeight)
+                                               options:NSStringDrawingUsesLineFragmentOrigin|NSStringDrawingUsesLineFragmentOrigin
+                                            attributes:fontAtts
+                                               context:nil];
+
+        return MAX(minHeight, rect.size.height);
     }
     return minHeight;
 }
@@ -880,6 +930,7 @@ static SIAlertView *__si_alert_current_view;
     [self setupContainerView];
     [self updateTitleLabel];
     [self updateMessageLabel];
+    [self updateContentView];
     [self setupButtons];
     [self invalidateLayout];
 }
@@ -890,6 +941,7 @@ static SIAlertView *__si_alert_current_view;
     self.containerView = nil;
     self.titleLabel = nil;
     self.messageLabel = nil;
+    self.contentView = nil;
     [self.buttons removeAllObjects];
     [self.alertWindow removeFromSuperview];
     self.alertWindow = nil;
@@ -917,11 +969,7 @@ static SIAlertView *__si_alert_current_view;
 			self.titleLabel.font = self.titleFont;
             self.titleLabel.textColor = self.titleColor;
             self.titleLabel.adjustsFontSizeToFitWidth = YES;
-#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_6_0
             self.titleLabel.minimumScaleFactor = 0.75;
-#else
-            self.titleLabel.minimumFontSize = self.titleLabel.font.pointSize * 0.75;
-#endif
 			[self.containerView addSubview:self.titleLabel];
 #if DEBUG_LAYOUT
             self.titleLabel.backgroundColor = [UIColor redColor];
@@ -954,6 +1002,14 @@ static SIAlertView *__si_alert_current_view;
     } else {
         [self.messageLabel removeFromSuperview];
         self.messageLabel = nil;
+    }
+    [self invalidateLayout];
+}
+
+- (void)updateContentView
+{
+    if (self.contentView) {
+        [self.containerView addSubview:self.contentView];
     }
     [self invalidateLayout];
 }
@@ -1138,40 +1194,7 @@ static SIAlertView *__si_alert_current_view;
     [self setColor:buttonColor toButtonsOfType:SIAlertViewButtonTypeDestructive];
 }
 
-
-- (void)setDefaultButtonImage:(UIImage *)defaultButtonImage forState:(UIControlState)state
-{
-    [self setButtonImage:defaultButtonImage forState:state andButtonType:SIAlertViewButtonTypeDefault];
-}
-
-
-- (void)setCancelButtonImage:(UIImage *)cancelButtonImage forState:(UIControlState)state
-{
-    [self setButtonImage:cancelButtonImage forState:state andButtonType:SIAlertViewButtonTypeCancel];
-}
-
-
-- (void)setDestructiveButtonImage:(UIImage *)destructiveButtonImage forState:(UIControlState)state
-{
-    [self setButtonImage:destructiveButtonImage forState:state andButtonType:SIAlertViewButtonTypeDestructive];
-}
-
-
-- (void)setButtonImage:(UIImage *)image forState:(UIControlState)state andButtonType:(SIAlertViewButtonType)type
-{
-    for (NSUInteger i = 0; i < self.items.count; i++)
-    {
-        SIAlertItem *item = self.items[i];
-        if(item.type == type)
-        {
-            UIButton *button = self.buttons[i];
-            [button setBackgroundImage:image forState:state];
-        }
-    }
-}
-
-
--(void)setColor:(UIColor *)color toButtonsOfType:(SIAlertViewButtonType)type {
+- (void)setColor:(UIColor *)color toButtonsOfType:(SIAlertViewButtonType)type {
     for (NSUInteger i = 0; i < self.items.count; i++) {
         SIAlertItem *item = self.items[i];
         if(item.type == type) {
@@ -1181,5 +1204,35 @@ static SIAlertView *__si_alert_current_view;
         }
     }
 }
+
+# pragma mark -
+# pragma mark Enable parallax effect (iOS7 only)
+
+#ifdef __IPHONE_7_0
+- (void)addParallaxEffect
+{
+    if (_enabledParallaxEffect && NSClassFromString(@"UIInterpolatingMotionEffect"))
+    {
+        UIInterpolatingMotionEffect *effectHorizontal = [[UIInterpolatingMotionEffect alloc] initWithKeyPath:@"position.x" type:UIInterpolatingMotionEffectTypeTiltAlongHorizontalAxis];
+        UIInterpolatingMotionEffect *effectVertical = [[UIInterpolatingMotionEffect alloc] initWithKeyPath:@"position.y" type:UIInterpolatingMotionEffectTypeTiltAlongVerticalAxis];
+        [effectHorizontal setMaximumRelativeValue:@(10.0f)];
+        [effectHorizontal setMinimumRelativeValue:@(-10.0f)];
+        [effectVertical setMaximumRelativeValue:@(20.0f)];
+        [effectVertical setMinimumRelativeValue:@(-20.0f)];
+        [self.containerView addMotionEffect:effectHorizontal];
+        [self.containerView addMotionEffect:effectVertical];
+    }
+}
+
+- (void)removeParallaxEffect
+{
+    if (_enabledParallaxEffect && NSClassFromString(@"UIInterpolatingMotionEffect"))
+    {
+        [self.containerView.motionEffects enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+            [self.containerView removeMotionEffect:obj];
+        }];
+    }
+}
+#endif
 
 @end
