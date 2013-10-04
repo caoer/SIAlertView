@@ -793,14 +793,6 @@ static SIAlertView *__si_alert_current_view;
     self.containerView.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.containerView.bounds cornerRadius:self.containerView.layer.cornerRadius].CGPath;
     
     CGFloat y = CONTENT_PADDING_TOP;
-    if (self.contentView) {
-        if (y > CONTENT_PADDING_TOP) {
-            y += GAP;
-        }
-        CGFloat height = self.contentView.bounds.size.height;
-        self.contentView.frame = CGRectMake(CONTENT_PADDING_LEFT, y, self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2, height);
-        y += height;
-    }
     
 	if (self.titleLabel) {
         if (y > CONTENT_PADDING_TOP) {
@@ -811,6 +803,16 @@ static SIAlertView *__si_alert_current_view;
         self.titleLabel.frame = CGRectMake(CONTENT_PADDING_LEFT, y, self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2, height);
         y += height;
 	}
+    
+    if (self.contentView) {
+        if (y > CONTENT_PADDING_TOP) {
+            y += GAP;
+        }
+        CGFloat height = self.contentView.bounds.size.height;
+        self.contentView.frame = CGRectMake(CONTENT_PADDING_LEFT, y, self.containerView.bounds.size.width - CONTENT_PADDING_LEFT * 2, height);
+        y += height;
+    }
+    
     if (self.messageLabel) {
         if (y > CONTENT_PADDING_TOP) {
             y += GAP;
