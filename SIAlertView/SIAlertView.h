@@ -44,6 +44,7 @@ typedef NS_ENUM(NSInteger, SIAlertViewStyle) {
 
 @class SIAlertView;
 typedef void(^SIAlertViewHandler)(SIAlertView *alertView);
+typedef void(^SIAlertViewTextFieldCustomizationHandler)(SIAlertView *alertView, UITextField *textField);
 
 @interface SIAlertView : UIView
 
@@ -60,6 +61,8 @@ typedef void(^SIAlertViewHandler)(SIAlertView *alertView);
 @property (nonatomic, copy) SIAlertViewHandler didShowHandler;
 @property (nonatomic, copy) SIAlertViewHandler willDismissHandler;
 @property (nonatomic, copy) SIAlertViewHandler didDismissHandler;
+
+@property (nonatomic, copy) SIAlertViewTextFieldCustomizationHandler textFieldCustomization;
 
 @property (nonatomic, readonly, getter = isVisible) BOOL visible;
 

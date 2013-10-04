@@ -1005,13 +1005,18 @@ static SIAlertView *__si_alert_current_view;
         self.textField = [[UITextField alloc] initWithFrame:self.bounds];
         self.textField.delegate = self;
         self.textField.text = @"";
-        self.textField.borderStyle = UITextBorderStyleBezel;
+        self.textField.layer.borderWidth = 1.0;
+        self.textField.layer.borderColor = [[UIColor colorWithWhite:0 alpha:0.4] CGColor];
+        
         [self.containerView addSubview:self.textField];
 #if DEBUG_LAYOUT
         self.textField.backgroundColor = [UIColor redColor];
 #endif
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillShowNotification:) name:UIKeyboardWillShowNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(keyboardWillHideNotification:) name:UIKeyboardWillHideNotification object:nil];
+    }
+    if (self.textFieldCustomization) {
+        self.textFieldCustomization(self, self.textField);
     }
     [self invalidateLayout];
 }

@@ -46,6 +46,8 @@
 - (IBAction)alert1:(id)sender
 {
     SIAlertView *alertView = [[SIAlertView alloc] initWithTitle:@"Title1" andMessage:@"Count down"];
+    alertView.alertViewStyle = SIAlertViewStylePlainTextInput;
+    
     [alertView addButtonWithTitle:@"Button1"
                              type:SIAlertViewButtonTypeDefault
                           handler:^(SIAlertView *alertView) {
